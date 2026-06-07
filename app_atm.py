@@ -3,7 +3,7 @@ from docxtpl import DocxTemplate
 import datetime
 import io
 
-# Configuración de la página (Limpia y directa)
+# Configuración de la página original
 st.set_page_config(page_title="Generador de Informes ATM", page_icon="🦷", layout="centered")
 
 st.title("📋 Generador de Informes Ecográficos ATM")
@@ -30,11 +30,11 @@ boca_abierta_i = st.number_input("Izquierdo - Boca Abierta (mm):", min_value=0.0
 
 # --- CÁLCULO DE LA POSICIÓN DEL CÓNDILO ---
 st.markdown("### 📐 Cálculo de la Posición del Cóndilo")
-# Fórmula: Traslación Condilar = Boca Cerrada - Boca Abierta
+# Fórmula original: Traslación Condilar = Boca Cerrada - Boca Abierta
 traslacion_d = boca_cerrada_d - boca_abierta_d
 traslacion_i = boca_cerrada_i - boca_abierta_i
 
-# Mostrar el resultado de forma limpia y legible en cualquier pantalla (Evita fallos de modo oscuro)
+# NUEVA BARRA PROTEGIDA PARA EL IPAD (Letras oscuras automáticas)
 st.info(f"📍 **Lado Derecho (Desplazamiento):** {traslacion_d:.1f} mm")
 st.info(f"📍 **Lado Izquierdo (Desplazamiento):** {traslacion_i:.1f} mm")
 
@@ -48,14 +48,14 @@ if st.button("🚀 DESCARGAR INFORME EN WORD"):
         st.error("⚠️ Por favor, introduzca el nombre del paciente antes de generar el informe.")
     else:
         try:
-            # Cargar la plantilla cargada en GitHub
+            # Cargar la plantilla original
             doc = DocxTemplate("plantilla_atm.docx")
             
             # Formatear fechas
             f_nac_str = fecha_nac.strftime("%d/%m/%Y")
             f_eco_str = fecha_eco.strftime("%d/%m/%Y")
             
-            # Crear el diccionario con los datos exactos para el Word
+            # Diccionario idéntico al original
             context = {
                 'nombre': nombre,
                 'fecha_nac': f_nac_str,
@@ -70,15 +70,12 @@ if st.button("🚀 DESCARGAR INFORME EN WORD"):
                 'observaciones': observaciones
             }
             
-            # Fusionar datos con la plantilla
             doc.render(context)
             
-            # Guardar el documento en memoria para descargarlo
             bio = io.BytesIO()
             doc.save(bio)
             bio.seek(0)
             
-            # Nombre de archivo limpio
             nombre_archivo = f"Informe_ATM_{nombre.replace(' ', '_')}.docx"
             
             st.download_button(
@@ -90,4 +87,5 @@ if st.button("🚀 DESCARGAR INFORME EN WORD"):
             st.success("¡Informe listo! Haz clic arriba para guardarlo.")
             
         except Exception as e:
+            st.error(f"Error al generar el Word: {e}. Asegúrate de tener el archivo 'plantilla_atm.docx' subido a GitHub.")
             st.error(f"Error al generar el Word: {e}. Asegúrate de tener el archivo 'plantilla_atm.docx' subido a GitHub.")
