@@ -7,7 +7,7 @@ import io
 # Configuración de página ancha profesional
 st.set_page_config(page_title="Informe Ecográfico ATM", layout="wide")
 
-# Estilo CSS unificado en azul clínico (Corregido: Medidas en blanco y casillas más grandes)
+# Estilo CSS unificado en azul clínico (Medidas en blanco y casillas más grandes)
 st.markdown("""
     <style>
     .titulo-principal { color: #1E3A8A; font-weight: bold; text-align: center; }
@@ -94,7 +94,8 @@ def componente_microfono(key_prefijo):
     .btn-voz:hover {{ background-color: #0369A1; }}
     </style>
     """
-    components.html(js_code, height=65)
+    # Corregido: allow="microphone" otorga los permisos necesarios dentro del entorno del iPad
+    components.html(js_code, height=65, scrolling=False)
 
 # --- LÓGICA DE RECEPCIÓN DE AUDIOS ---
 if 'mas_d_val' not in st.session_state: st.session_state.mas_d_val = ""
