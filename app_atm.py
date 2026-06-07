@@ -7,7 +7,7 @@ import io
 # Configuración de página ancha profesional
 st.set_page_config(page_title="Informe Ecográfico ATM", layout="wide")
 
-# Estilo CSS original e impecable
+# Estilo CSS original, limpio y adaptado para iPad
 st.markdown("""
     <style>
     .titulo-principal { color: #1E3A8A; font-weight: bold; text-align: center; }
@@ -15,112 +15,131 @@ st.markdown("""
     .titulo-medidas { font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #FFFFFF !important; }
     .esfera { font-size: 16px; vertical-align: middle; margin-right: 5px; }
     .resultado-calculo { background-color: #E0F2FE; padding: 10px; border-radius: 5px; border-left: 4px solid #0284C7; margin-top: 10px; font-size: 14px; color: #1E3A8A !important; }
-    .btn-voz { background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; font-size: 13px; }
-    .btn-voz:hover { background-color: #0369A1; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulación Temporomandibular (ATM)</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
-# --- INICIALIZACIÓN DE VALORES SEGUROS EN MEMORIA ---
-if 'mas_d' not in st.session_state: st.session_state.mas_d = ""
-if 'mlat_d' not in st.session_state: st.session_state.mlat_d = ""
-if 'mpi_d' not in st.session_state: st.session_state.mpi_d = ""
-
-if 'mas_i' not in st.session_state: st.session_state.mas_i = ""
-if 'mlat_i' not in st.session_state: st.session_state.mlat_i = ""
-if 'mpi_i' not in st.session_state: st.session_state.mpi_i = ""
-
-# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CANAL OFICIAL) ---
-def componente_microfono(key_prefijo):
+# --- FUNCIÓN DEL MICRÓFONO INTELIGENTE ON/OFF ---
+def componente_microfono(lado_id):
+    # Generamos identificadores únicos para los campos de texto según el lado
+    id_as = f"input_as_{lado_id}"
+    id_lat = f"input_lat_{lado_id}"
+    id_pi = f"input_pi_{lado_id}"
+    
     js_code = f"""
-    <div id="wrapper_{key_prefijo}">
-        <button class="btn-voz" id="btn_{key_prefijo}" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
-        <p id="status_{key_prefijo}" style="font-size:11px; color:#666; margin:2px 0 0 0; font-family:sans-serif;">Micro listo</p>
+    <div style="font-family: sans-serif; margin-bottom: 10px;">
+        <button id="btn_{lado_id}" class="btn-voz btn-azul" onclick="conmutarMicro('{lado_id}')">🎙️ Dictar 3 Medidas</button>
+        <p id="status_{lado_id}" style="font-size:11px; color:#666; margin:4px 0 0 2px;">Micro listo</p>
     </div>
 
     <script>
-    function sendToStreamlit(vAs, vLat, vPi) {{
-        if (window.Streamlit) {{
-            Streamlit.setComponentValue({{as: vAs, lat: vLat, pi: vPi}});
-        }}
-    }}
+    let recognition_{lado_id} = null;
+    let activo_{lado_id} = false;
 
-    function iniciarDictado(prefix) {{
-        const status = document.getElementById('status_' + prefix);
-        const btn = document.getElementById('btn_' + prefix);
-        
+    function conmutarMicro(lado) {{
+        const btn = document.getElementById('btn_' + lado);
+        const status = document.getElementById('status_' + lado);
+
+        if (activo_{lado_id}) {{
+            // FUNCIÓN: Si está activo, apagar inmediatamente al pulsar de nuevo
+            if (recognition_{lado_id}) {{
+                recognition_{lado_id}.abort();
+            }}
+            resetearBoton(lado, "🛑 Dictado cancelado por el usuario.");
+            return;
+        }}
+
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
             status.innerText = "Navegador no compatible.";
             return;
         }}
-        
-        if(btn.disabled) return;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'es-ES';
-        recognition.interimResults = false;
-        recognition.maxAlternatives = 1;
+        recognition_{lado_id} = new SpeechRecognition();
+        recognition_{lado_id}.lang = 'es-ES';
+        recognition_{lado_id}.interimResults = false;
+        recognition_{lado_id}.maxAlternatives = 1;
 
-        status.innerText = "🎙️ Escuchando... Di los 3 números";
+        // Cambiar estado a encendido (Botón Rojo de stop)
+        activo_{lado_id} = true;
+        btn.innerText = "🛑 Detener / Cancelar";
+        btn.className = "btn-voz btn-rojo";
+        status.innerText = "🎙️ Escuchando... Di los 3 números seguidos";
         status.style.color = "#0284C7";
-        btn.disabled = true;
-        btn.style.opacity = "0.6";
 
-        recognition.start();
+        recognition_{lado_id}.start();
 
-        recognition.onresult = function(event) {{
+        recognition_{lado_id}.onresult = function(event) {{
             const texto = event.results[0][0].transcript;
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
             if (matches && matches.length >= 3) {{
-                status.innerText = "✓ Transcrito: " + matches[0] + " | " + matches[1] + " | " + matches[2];
+                status.innerText = "✓ Medidas introducidas con éxito.";
                 status.style.color = "#16A34A";
-                sendToStreamlit(matches[0], matches[1], matches[2]);
+                
+                // INYECTOR DIRECTO AL DOM DEL IPAD (Fuerza la inserción interna y dispara los cálculos)
+                inyectarValor('{id_as}', matches[0]);
+                inyectarValor('{id_lat}', matches[1]);
+                inyectarValor('{id_pi}', matches[2]);
             }} else {{
-                status.innerText = "❌ No se detectaron 3 números numéricos. Reintenta.";
+                status.innerText = "❌ No se capturaron 3 números. Inténtalo de nuevo.";
                 status.style.color = "#DC2626";
-                resetearBoton();
             }}
         }};
 
-        function resetearBoton() {{
-            btn.disabled = false;
-            btn.style.opacity = "1";
-        }}
-
-        recognition.onerror = function() {{
-            status.innerText = "❌ Error de micro o silencio. Pulsa para reintentar.";
-            status.style.color = "#DC2626";
-            resetearBoton();
+        recognition_{lado_id}.onerror = function(e) {{
+            if (e.error !== 'aborted') {{
+                status.innerText = "❌ Error de micro o silencio prolongado.";
+                status.style.color = "#DC2626";
+            }}
+            resetearBoton(lado, status.innerText);
         }};
         
-        recognition.onend = function() {{
-            resetearBoton();
+        recognition_{lado_id}.onend = function() {{
+            resetearBoton(lado, status.innerText);
         }};
     }}
-    
-    (function() {{
-        var stScript = document.createElement('script');
-        stScript.src = "https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js";
-        stScript.onload = function() {{
-            window.addEventListener('load', function() {{
-                Streamlit.setFrameHeight(55);
-            }});
-        }};
-        document.head.appendChild(stScript);
-    }})();
+
+    function inyectarValor(idCampo, valor) {{
+        // Buscamos la casilla en la ventana principal del iPad
+        const el = window.parent.document.getElementById(idCampo);
+        if (el) {{
+            el.value = valor;
+            // Disparar eventos nativos para que el motor matemático calcule al instante
+            el.dispatchEvent(new Event('input', {{ bubbles: true }}));
+            el.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            el.dispatchEvent(new Event('blur', {{ bubbles: true }}));
+        }}
+    }}
+
+    function resetearBoton(lado, msg) {{
+        activo_{lado_id} = false;
+        const btn = document.getElementById('btn_' + lado);
+        const status = document.getElementById('status_' + lado);
+        btn.innerText = "🎙️ Dictar 3 Medidas";
+        btn.className = "btn-voz btn-azul";
+        if(msg) {{
+            status.innerText = msg;
+        }} else {{
+            status.innerText = "Micro listo";
+            status.style.color = "#666";
+        }}
+    }}
     </script>
+
     <style>
-    .btn-voz {{ background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: sans-serif; font-size: 13px; }}
-    .btn-voz:hover {{ background-color: #0369A1; }}
+    .btn-voz {{ border: none; padding: 7px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s; }}
+    .btn-azul {{ background-color: #0284C7; color: white; }}
+    .btn-azul:hover {{ background-color: #0369A1; }}
+    .btn-rojo {{ background-color: #DC2626; color: white; }}
+    .btn-rojo:hover {{ background-color: #B91C1C; }}
     </style>
     """
-    return components.html(js_code, height=55, scrolling=False)
+    components.html(js_code, height=52, scrolling=False)
 
-# --- FUNCIÓN CORREGIDA PARA CALCULAR EL ÍNDICE DE PULLINGER (NÚMERO ABSOLUTO) ---
+# --- FUNCIÓN CORREGIDA PARA EL ÍNDICE DE PULLINGER (NÚMERO ABSOLUTO CON SIGNO) ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
     try:
         if not ant_sup_txt or not post_inf_txt:
@@ -128,7 +147,8 @@ def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
         as_val = float(str(ant_sup_txt).replace(',', '.'))
         pi_val = float(str(post_inf_txt).replace(',', '.'))
         if (pi_val + as_val) == 0: 
-            return "0.0"
+            return "0.00"
+        # Fórmula matemática Pullinger original (*100 es parte del índice absoluto)
         resultado = ((pi_val - as_val) / (pi_val + as_val)) * 100
         signo = "+" if resultado > 0 else ""
         return f"{signo}{resultado:.2f}"
@@ -188,22 +208,14 @@ with col_der:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Captura oficial del micrófono corregida y segura
-    data_micro_der = componente_microfono("der")
+    # Renderizamos el botón con el conmutador ON/OFF integrado
+    componente_microfono("der")
     
-    if isinstance(data_micro_der, dict):
-        if data_micro_der.get("as"): st.session_state.mas_d = data_micro_der["as"]
-        if data_micro_der.get("lat"): st.session_state.mlat_d = data_micro_der["lat"]
-        if data_micro_der.get("pi"): st.session_state.mpi_d = data_micro_der["pi"]
-        
+    # Fila de casillas original con IDs explícitos para el inyector rápido
     m1, m2, m3 = st.columns(3)
-    with m1: med_as_der = st.text_input("Anterosuperior (D)", value=st.session_state.mas_d, key="mas_d_field")
-    with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d, key="mlat_d_field")
-    with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d, key="mpi_d_field")
-    
-    st.session_state.mas_d = med_as_der
-    st.session_state.mlat_d = med_lat_der
-    st.session_state.mpi_d = med_pi_der
+    with m1: med_as_der = st.text_input("Anterosuperior (D)", key="input_as_der")
+    with m2: med_lat_der = st.text_input("Lateral (D)", key="input_lat_der")
+    with m3: med_pi_der = st.text_input("Posteroinferior (D)", key="input_pi_der")
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
@@ -235,22 +247,14 @@ with col_izq:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Captura oficial del micrófono corregida y segura
-    data_micro_izq = componente_microfono("izq")
+    # Renderizamos el botón con el conmutador ON/OFF integrado
+    componente_microfono("izq")
     
-    if isinstance(data_micro_izq, dict):
-        if data_micro_izq.get("as"): st.session_state.mas_i = data_micro_izq["as"]
-        if data_micro_izq.get("lat"): st.session_state.mlat_i = data_micro_izq["lat"]
-        if data_micro_izq.get("pi"): st.session_state.mpi_i = data_micro_izq["pi"]
-        
+    # Fila de casillas original con IDs explícitos para el inyector rápido
     m4, m5, m6 = st.columns(3)
-    with m4: med_as_izq = st.text_input("Anterosuperior (I)", value=st.session_state.mas_i, key="mas_i_field")
-    with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i, key="mlat_i_field")
-    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i, key="mpi_i_field")
-    
-    st.session_state.mas_i = med_as_izq
-    st.session_state.mlat_i = med_lat_izq
-    st.session_state.mpi_i = med_pi_izq
+    with m4: med_as_izq = st.text_input("Anterosuperior (I)", key="input_as_izq")
+    with m5: med_lat_izq = st.text_input("Lateral (I)", key="input_lat_izq")
+    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", key="input_pi_izq")
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
@@ -286,7 +290,7 @@ try:
     
     contexto = {
         'nombres': nombres, 'apellidos': apellidos, 'edad': edad, 'derivado': derivado,
-        'fecha': fecha.strftime("%d/%m/%Y"), 'motivo': motivo, 'antecedentes': antecedentes, 'tratamiento_act': treatment_act if 'treatment_act' in locals() else tratamiento_act,
+        'fecha': fecha.strftime("%d/%m/%Y"), 'motivo': motivo, 'antecedentes': antecedentes, 'tratamiento_act': tratamiento_act,
         'morfologia_der': morfologia_der_txt, 'cartilago_der': cartilago_der, 'espacio_der': espacio_der_txt, 
         'med_as_der': med_as_der, 'med_lat_der': med_lat_der, 'med_pi_der': med_pi_der,
         'ecoestructura_der': ecoestructura_der, 'situacion_der': situacion_der, 'relacion_der': relacion_der,
