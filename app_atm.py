@@ -78,7 +78,7 @@ def componente_microfono_visible(lado_id):
 
         recognition_{lado_id}.start();
 
-        recognition_{lado_id].onresult = function(event) {{
+        recognition_{lado_id}.onresult = function(event) {{
             const texto = event.results[0][0].transcript;
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
@@ -143,12 +143,10 @@ def componente_microfono_visible(lado_id):
 
 # --- FUNCIÓN EXTRACTORA DE TEXTO DICTADO ---
 def extraer_tres_medidas(texto_dictado, campo_manual_as, campo_manual_lat, campo_manual_pi):
-    # Si hay texto del dictado por voz, lo procesamos con prioridad
     if texto_dictado and isinstance(texto_dictado, str):
         numeros = re.findall(r"[-+]?\d*\.\d+|\d+", texto_dictado)
         if len(numeros) >= 3:
             return numeros[0], numeros[1], numeros[2]
-    # Si no se ha dictado nada, devolvemos los valores manuales escritos en las casillas grises
     return campo_manual_as, campo_manual_lat, campo_manual_pi
 
 # --- FUNCIÓN MATEMÁTICA CORREGIDA DEL ÍNDICE DE PULLINGER ---
@@ -187,7 +185,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # --- OPCIONES MÉDICAS ---
 opts_morfologia = ["Redondeado", "Aplanado", "En pico de pájaro (en punta)", "Con cresta central", "Con cresta marginal"]
 opts_cartilago = ["Regular", "Irregular", "Fragmentado, sin exposición del hueso subyacente", "Fragmentado con exposición del hueso subyacente"]
-opts_espacio = ["Libre", "Sin derrame articular", "Con engrosamiento sinovial", "Con derrame anecoico", "Con derrame articular and con partículas ecogénicas", "Osteofitos"]
+opts_espacio = ["Libre", "Sin derrame articular", "Con engrosamiento sinovial", "Con derrame anecoico", "Con derrame articular y con partículas ecogénicas", "Osteofitos"]
 opts_ecoestructura = ["Homogénea, hipoecogénico", "Heterogénea", "Irregular"]
 opts_situacion = ["Central, cubre la cabeza condilar", "Cubre parcialmente la cabeza condilar", "Desplazamiento, no cubre la cabeza condilar"]
 opts_relacion = ["Central", "Anterior", "Posterior"]
