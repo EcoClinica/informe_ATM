@@ -23,23 +23,21 @@ st.markdown("""
 st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulación Temporomandibular (ATM)</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
-# --- INICIALIZACIÓN DE VALORES SEGUROS EN MEMORIA ---
-if 'mas_d' not in st.session_state: st.session_state.mas_d = ""
-if 'mlat_d' not in st.session_state: st.session_state.mlat_d = ""
-if 'mpi_d' not in st.session_state: st.session_state.mpi_d = ""
-
-if 'mas_i' not in st.session_state: st.session_state.mas_i = ""
-if 'mlat_i' not in st.session_state: st.session_state.mlat_i = ""
-if 'mpi_i' not in st.session_state: st.session_state.mpi_i = ""
-
-# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CON CONEXIÓN AL BACKEND) ---
+# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CANAL OFICIAL) ---
 def componente_microfono(key_prefijo):
     js_code = f"""
-    <button class="btn-voz" id="btn_{key_prefijo}" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
-    <p id="status_{key_prefijo}" style="font-size:11px; color:#666; margin:2px 0 0 0; font-family:sans-serif;">Micro listo</p>
+    <div id="wrapper_{key_prefijo}">
+        <button class="btn-voz" id="btn_{key_prefijo}" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
+        <p id="status_{key_prefijo}" style="font-size:11px; color:#666; margin:2px 0 0 0; font-family:sans-serif;">Micro listo</p>
+    </div>
 
     <script>
-    let recognition = null;
+    // Conexión obligatoria con el sistema de Streamlit
+    function sendToStreamlit(vAs, vLat, vPi) {{
+        if (window.Streamlit) {{
+            Streamlit.setComponentValue({{as: vAs, lat: vLat, pi: vPi}});
+        }}
+    }}
 
     function iniciarDictado(prefix) {{
         const status = document.getElementById('status_' + prefix);
@@ -53,7 +51,7 @@ def componente_microfono(key_prefijo):
         if(btn.disabled) return;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognition = new SpeechRecognition();
+        const recognition = new SpeechRecognition();
         recognition.lang = 'es-ES';
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
@@ -70,18 +68,11 @@ def componente_microfono(key_prefijo):
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
             if (matches && matches.length >= 3) {{
-                status.innerText = "✓ Procesado con éxito";
+                status.innerText = "✓ Transcrito: " + matches[0] + " | " + matches[1] + " | " + matches[2];
                 status.style.color = "#16A34A";
-                
-                // Enviamos los datos simulando un cambio de query param para que Streamlit reaccione de forma nativa
-                const url = new URL(window.parent.location.href);
-                url.searchParams.set('lado', prefix);
-                url.searchParams.set('as', matches[0]);
-                url.searchParams.set('lat', matches[1]);
-                url.searchParams.set('pi', matches[2]);
-                window.parent.location.href = url.href;
+                sendToStreamlit(matches[0], matches[1], matches[2]);
             }} else {{
-                status.innerText = "❌ Di 3 números claramente.";
+                status.innerText = "❌ No se detectaron 3 números numéricos. Reintenta.";
                 status.style.color = "#DC2626";
                 resetearBoton();
             }}
@@ -93,7 +84,7 @@ def componente_microfono(key_prefijo):
         }}
 
         recognition.onerror = function() {{
-            status.innerText = "❌ Error de micro. Reintenta.";
+            status.innerText = "❌ Error de micro o silencio. Pulsa para reintentar.";
             status.style.color = "#DC2626";
             resetearBoton();
         }};
@@ -102,38 +93,39 @@ def componente_microfono(key_prefijo):
             resetearBoton();
         }};
     }}
+    
+    // Configuración del script de inicialización nativa
+    (function() {{
+        var stScript = document.createElement('script');
+        stScript.src = "https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js";
+        stScript.onload = function() {{
+            window.addEventListener('load', function() {{
+                Streamlit.setFrameHeight(55);
+            }});
+        }};
+        document.head.appendChild(stScript);
+    }})();
     </script>
     <style>
     .btn-voz {{ background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: sans-serif; font-size: 13px; }}
     .btn-voz:hover {{ background-color: #0369A1; }}
     </style>
     """
-    components.html(js_code, height=55, scrolling=False)
+    return components.html(js_code, height=55, scrolling=False)
 
-# --- PROCESADOR DE DATOS DESDE EL REFRESCO ---
-params = st.query_params
-if "lado" in params:
-    lado_act = params["lado"]
-    if lado_act == "der":
-        st.session_state.mas_d = params.get("as", "")
-        st.session_state.mlat_d = params.get("lat", "")
-        st.session_state.mpi_d = params.get("pi", "")
-    elif lado_act == "izq":
-        st.session_state.mas_i = params.get("as", "")
-        st.session_state.mlat_i = params.get("lat", "")
-        st.session_state.mpi_i = params.get("pi", "")
-    # Limpiamos los parámetros para que no se queden en bucle
-    st.query_params.clear()
-
-# --- FUNCIÓN PARA CALCULAR LA FÓRMULA DE PULLINGER ---
+# --- FUNCIÓN CORREGIDA PARA CALCULAR EL ÍNDICE DE PULLINGER (NÚMERO ABSOLUTO) ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
     try:
-        as_val = float(ant_sup_txt.replace(',', '.')) if ant_sup_txt else 0.0
-        pi_val = float(post_inf_txt.replace(',', '.')) if post_inf_txt else 0.0
-        if (pi_val + as_val) == 0: 
+        if not ant_sup_txt or not post_inf_txt:
             return "Esperando medidas..."
+        as_val = float(str(ant_sup_txt).replace(',', '.'))
+        pi_val = float(str(post_inf_txt).replace(',', '.'))
+        if (pi_val + as_val) == 0: 
+            return "0.0"
+        # Pullinger fórmula directa resultando en un índice absoluto con signo
         resultado = ((pi_val - as_val) / (pi_val + as_val)) * 100
-        return f"{resultado:.1f}%"
+        signo = "+" if resultado > 0 else ""
+        return f"{signo}{resultado:.2f}"
     except ValueError:
         return "Medidas no válidas"
 
@@ -189,13 +181,25 @@ with col_der:
     espacio_der = st.multiselect("Espacio articular (D):", opts_espacio, default=["Libre"], key="es_der")
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
-    componente_microfono("der")
     
-    # Vinculación directa a la memoria interna de la App
+    # Captura oficial del componente del micrófono
+    data_micro_der = componente_microfono("der")
+    
+    # Si el micrófono capturó datos por voz, los priorizamos en la memoria
+    if data_micro_der a_dict := isinstance(data_micro_der, dict):
+        if data_micro_der.get("as"): st.session_state.mas_d = data_micro_der["as"]
+        if data_micro_der.get("lat"): st.session_state.mlat_d = data_micro_der["lat"]
+        if data_micro_der.get("pi"): st.session_state.mpi_d = data_micro_der["pi"]
+        
     m1, m2, m3 = st.columns(3)
-    with m1: med_as_der = st.text_input("Anterosuperior (D)", value=st.session_state.mas_d, key="mas_d_input")
-    with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d, key="mlat_d_input")
-    with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d, key="mpi_d_input")
+    with m1: med_as_der = st.text_input("Anterosuperior (D)", value=st.session_state.mas_d, key="mas_d_field")
+    with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d, key="mlat_d_field")
+    with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d, key="mpi_d_field")
+    
+    # Sincronizamos por si el usuario edita a mano después de dictar
+    st.session_state.mas_d = med_as_der
+    st.session_state.mlat_d = med_lat_der
+    st.session_state.mpi_d = med_pi_der
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
@@ -226,13 +230,25 @@ with col_izq:
     espacio_izq = st.multiselect("Espacio articular (I):", opts_espacio, default=["Libre"], key="es_izq")
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
-    componente_microfono("izq")
     
-    # Vinculación directa a la memoria interna de la App
+    # Captura oficial del componente del micrófono
+    data_micro_izq = componente_microfono("izq")
+    
+    # Si el micrófono capturó datos por voz, los priorizamos en la memoria
+    if data_micro_izq a_dict_i := isinstance(data_micro_izq, dict):
+        if data_micro_izq.get("as"): st.session_state.mas_i = data_micro_izq["as"]
+        if data_micro_izq.get("lat"): st.session_state.mlat_i = data_micro_izq["lat"]
+        if data_micro_izq.get("pi"): st.session_state.mpi_i = data_micro_izq["pi"]
+        
     m4, m5, m6 = st.columns(3)
-    with m4: med_as_izq = st.text_input("Anterosuperior (I)", value=st.session_state.mas_i, key="mas_i_input")
-    with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i, key="mlat_i_input")
-    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i, key="mpi_i_input")
+    with m4: med_as_izq = st.text_input("Anterosuperior (I)", value=st.session_state.mas_i, key="mas_i_field")
+    with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i, key="mlat_i_field")
+    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i, key="mpi_i_field")
+    
+    # Sincronizamos por si el usuario edita a mano después de dictar
+    st.session_state.mas_i = med_as_izq
+    st.session_state.mlat_i = med_lat_izq
+    st.session_state.mpi_i = med_pi_izq
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
