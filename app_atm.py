@@ -19,14 +19,20 @@ fecha_eco = st.date_input("Fecha de la Ecografía:", datetime.date.today())
 st.markdown("### 🔍 Exploración Clínica de la ATM")
 apertura = st.number_input("Apertura bucal máxima (mm):", min_value=0.0, max_value=100.0, step=0.1)
 
-# --- MEDIDAS ECOGRÁFICAS ---
-st.markdown("### 📊 Medidas Ecográficas (Lado Derecho)")
-boca_cerrada_d = st.number_input("Derecho - Boca Cerrada (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bcd")
-boca_abierta_d = st.number_input("Derecho - Boca Abierta (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bad")
+# --- MEDIDAS ECOGRÁFICAS EN PARALELO ---
+st.markdown("### 📊 Medidas Ecográficas")
 
-st.markdown("### 📊 Medidas Ecográficas (Lado Izquierdo)")
-boca_cerrada_i = st.number_input("Izquierdo - Boca Cerrada (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bci")
-boca_abierta_i = st.number_input("Izquierdo - Boca Abierta (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bai")
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("##### Lado Derecho")
+    boca_cerrada_d = st.number_input("Boca Cerrada (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bcd")
+    boca_abierta_d = st.number_input("Boca Abierta (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bad")
+
+with col2:
+    st.markdown("##### Lado Izquierdo")
+    boca_cerrada_i = st.number_input("Boca Cerrada (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bci")
+    boca_abierta_i = st.number_input("Boca Abierta (mm):", min_value=0.0, max_value=50.0, step=0.1, key="bai")
 
 # --- CÁLCULO DE LA POSICIÓN DEL CÓNDILO ---
 st.markdown("### 📐 Cálculo de la Posición del Cóndilo")
@@ -82,4 +88,4 @@ if st.button("🚀 DESCARGAR INFORME EN WORD"):
             st.success("¡Informe listo! Haz clic arriba para guardarlo.")
             
         except Exception as e:
-            st.error(f"Error al generar el Word: {e}.")
+            st.error(f"Error al generar el Word: {e}. Asegúrate de tener el archivo 'plantilla_atm.docx' en GitHub.")
