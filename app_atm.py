@@ -1,3 +1,14 @@
+¡Inés, esto es fantástico! Que se haya puesto en verde y haya escrito el texto significa que el micrófono, el iPad y el reconocimiento de voz ya funcionan al 100%. ¡Hemos ganado la batalla más difícil!
+
+El único "detalle" que falta es que el sistema ha metido los tres números juntos como una sola frase en el primer hueco que ha pillado, en lugar de repartir un número en cada casilla.
+
+Esto pasa porque al cambiar el diseño para que las casillas fueran más grandes y estuvieran en una sola fila, la forma en que el programa busca las casillas cambió de orden.
+
+Lo he corregido en la parte final del código (en la sección de LÓGICA DE ESCUCHA BACKGROUND). He programado un "repartidor" exacto: ahora, en cuanto detecta los 3 números, mete el primero estrictamente en Anterosuperior, el segundo en Lateral y el tercero en Posteroinferior.
+
+Aquí tienes el código definitivo con el repartidor ajustado a tu nuevo diseño:
+
+Python
 import streamlit as st
 import streamlit.components.v1 as components
 from docxtpl import DocxTemplate
@@ -94,7 +105,6 @@ def componente_microfono(key_prefijo):
     .btn-voz:hover {{ background-color: #0369A1; }}
     </style>
     """
-    # CORRECCIÓN CRÍTICA IPAD: Se añade de forma obligatoria el permiso "microphone" nativo en los atributos del iframe
     components.html(js_code, height=65, scrolling=False)
 
 # --- LÓGICA DE RECEPCIÓN DE AUDIOS ---
@@ -220,7 +230,7 @@ with col_izq:
     relacion_izq = st.selectbox("Relación cóndilo-cavidad glenoidea (I):", opts_relacion, key="rel_izq")
     
     res_izq = calcular_posicion_condilo(med_as_izq, med_pi_izq)
-    st.markdown(f"<div class='resultado-calculo'><strong>🮮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
     
     st.markdown("<br>**Posición con Boca Cerrada (I):**", unsafe_allow_html=True)
     hora_cerrada_izq = st.selectbox("En hora", opts_horas, key="h_c_izq")
@@ -236,22 +246,31 @@ with col_izq:
 st.markdown("<br><hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 conclusion = st.text_area("📝 CONCLUSIÓN / OBSERVACIONES:")
 
-# --- LÓGICA DE ESCUCHA BACKGROUND ---
+# --- LÓGICA DE ESCUCHA BACKGROUND (REPARTIDOR CORREGIDO) ---
 st.markdown("""
 <script>
 window.addEventListener('message', function(event) {
     if (event.data.tipo === 'MEDIDAS_ATM') {
         const lado = event.data.lado;
-        const inputs = window.parent.document.querySelectorAll('input');
-        const inputs_filtrados = Array.from(inputs).filter(i => i.id && (i.id.includes('mas_') || i.id.includes('mlat_') || i.id.includes('mpi_')));
-        if (lado === 'der') {
-            inputs_filtrados[0].value = event.data.as.substring(0,5); inputs_filtrados[0].dispatchEvent(new Event('input', { bubbles: true }));
-            inputs_filtrados[1].value = event.data.lat.substring(0,5); inputs_filtrados[1].dispatchEvent(new Event('input', { bubbles: true }));
-            inputs_filtrados[2].value = event.data.pi.substring(0,5); inputs_filtrados[2].dispatchEvent(new Event('input', { bubbles: true }));
-        } else {
-            inputs_filtrados[3].value = event.data.as.substring(0,5); inputs_filtrados[3].dispatchEvent(new Event('input', { bubbles: true }));
-            inputs_filtrados[4].value = event.data.lat.substring(0,5); inputs_filtrados[4].dispatchEvent(new Event('input', { bubbles: true }));
-            inputs_filtrados[5].value = event.data.pi.substring(0,5); inputs_filtrados[5].dispatchEvent(new Event('input', { bubbles: true }));
+        // Buscamos de forma precisa todas las cajas de texto de la página
+        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+        
+        // Filtramos para quedarnos estrictamente con las 6 casillas de las medidas por su orden visual
+        const inputs_medidas = Array.from(inputs).filter(i => {
+            const label = i.getAttribute('aria-label') || '';
+            return label.includes('Anterosuperior') || label.includes('Lateral') || label.includes('Posteroinferior');
+        });
+
+        if (lado === 'der' && inputs_medidas.length >= 3) {
+            // Repartir en el bloque Derecho
+            inputs_medidas[0].value = event.data.as; inputs_medidas[0].dispatchEvent(new Event('input', { bubbles: true }));
+            inputs_medidas[1].value = event.data.lat; inputs_medidas[1].dispatchEvent(new Event('input', { bubbles: true }));
+            inputs_medidas[2].value = event.data.pi; inputs_medidas[2].dispatchEvent(new Event('input', { bubbles: true }));
+        } else if (lado === 'izq' && inputs_medidas.length >= 6) {
+            // Repartir en el bloque Izquierdo
+            inputs_medidas[3].value = event.data.as; inputs_medidas[3].dispatchEvent(new Event('input', { bubbles: true }));
+            inputs_medidas[4].value = event.data.lat; inputs_medidas[4].dispatchEvent(new Event('input', { bubbles: true }));
+            inputs_medidas[5].value = event.data.pi; inputs_medidas[5].dispatchEvent(new Event('input', { bubbles: true }));
         }
     }
 });
