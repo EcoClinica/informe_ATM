@@ -23,6 +23,15 @@ st.markdown("""
 st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulación Temporomandibular (ATM)</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
+# --- INICIALIZACIÓN DE VALORES SEGUROS EN MEMORIA ---
+if 'mas_d' not in st.session_state: st.session_state.mas_d = ""
+if 'mlat_d' not in st.session_state: st.session_state.mlat_d = ""
+if 'mpi_d' not in st.session_state: st.session_state.mpi_d = ""
+
+if 'mas_i' not in st.session_state: st.session_state.mas_i = ""
+if 'mlat_i' not in st.session_state: st.session_state.mlat_i = ""
+if 'mpi_i' not in st.session_state: st.session_state.mpi_i = ""
+
 # --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CANAL OFICIAL) ---
 def componente_microfono(key_prefijo):
     js_code = f"""
@@ -32,7 +41,6 @@ def componente_microfono(key_prefijo):
     </div>
 
     <script>
-    // Conexión obligatoria con el sistema de Streamlit
     function sendToStreamlit(vAs, vLat, vPi) {{
         if (window.Streamlit) {{
             Streamlit.setComponentValue({{as: vAs, lat: vLat, pi: vPi}});
@@ -94,7 +102,6 @@ def componente_microfono(key_prefijo):
         }};
     }}
     
-    // Configuración del script de inicialización nativa
     (function() {{
         var stScript = document.createElement('script');
         stScript.src = "https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js";
@@ -122,7 +129,6 @@ def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
         pi_val = float(str(post_inf_txt).replace(',', '.'))
         if (pi_val + as_val) == 0: 
             return "0.0"
-        # Pullinger fórmula directa resultando en un índice absoluto con signo
         resultado = ((pi_val - as_val) / (pi_val + as_val)) * 100
         signo = "+" if resultado > 0 else ""
         return f"{signo}{resultado:.2f}"
@@ -182,11 +188,10 @@ with col_der:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Captura oficial del componente del micrófono
+    # Captura oficial del micrófono corregida y segura
     data_micro_der = componente_microfono("der")
     
-    # Si el micrófono capturó datos por voz, los priorizamos en la memoria
-    if data_micro_der a_dict := isinstance(data_micro_der, dict):
+    if isinstance(data_micro_der, dict):
         if data_micro_der.get("as"): st.session_state.mas_d = data_micro_der["as"]
         if data_micro_der.get("lat"): st.session_state.mlat_d = data_micro_der["lat"]
         if data_micro_der.get("pi"): st.session_state.mpi_d = data_micro_der["pi"]
@@ -196,7 +201,6 @@ with col_der:
     with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d, key="mlat_d_field")
     with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d, key="mpi_d_field")
     
-    # Sincronizamos por si el usuario edita a mano después de dictar
     st.session_state.mas_d = med_as_der
     st.session_state.mlat_d = med_lat_der
     st.session_state.mpi_d = med_pi_der
@@ -231,11 +235,10 @@ with col_izq:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Captura oficial del componente del micrófono
+    # Captura oficial del micrófono corregida y segura
     data_micro_izq = componente_microfono("izq")
     
-    # Si el micrófono capturó datos por voz, los priorizamos en la memoria
-    if data_micro_izq a_dict_i := isinstance(data_micro_izq, dict):
+    if isinstance(data_micro_izq, dict):
         if data_micro_izq.get("as"): st.session_state.mas_i = data_micro_izq["as"]
         if data_micro_izq.get("lat"): st.session_state.mlat_i = data_micro_izq["lat"]
         if data_micro_izq.get("pi"): st.session_state.mpi_i = data_micro_izq["pi"]
@@ -245,7 +248,6 @@ with col_izq:
     with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i, key="mlat_i_field")
     with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i, key="mpi_i_field")
     
-    # Sincronizamos por si el usuario edita a mano después de dictar
     st.session_state.mas_i = med_as_izq
     st.session_state.mlat_i = med_lat_izq
     st.session_state.mpi_i = med_pi_izq
@@ -284,7 +286,7 @@ try:
     
     contexto = {
         'nombres': nombres, 'apellidos': apellidos, 'edad': edad, 'derivado': derivado,
-        'fecha': fecha.strftime("%d/%m/%Y"), 'motivo': motivo, 'antecedentes': antecedentes, 'tratamiento_act': tratamiento_act,
+        'fecha': fecha.strftime("%d/%m/%Y"), 'motivo': motivo, 'antecedentes': antecedentes, 'tratamiento_act': treatment_act if 'treatment_act' in locals() else tratamiento_act,
         'morfologia_der': morfologia_der_txt, 'cartilago_der': cartilago_der, 'espacio_der': espacio_der_txt, 
         'med_as_der': med_as_der, 'med_lat_der': med_lat_der, 'med_pi_der': med_pi_der,
         'ecoestructura_der': ecoestructura_der, 'situacion_der': situacion_der, 'relacion_der': relacion_der,
