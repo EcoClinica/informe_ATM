@@ -3,34 +3,8 @@ from docxtpl import DocxTemplate
 import datetime
 import io
 
-# Configuración de la página (Fuerza el modo claro para evitar fallos en el iPad)
+# Configuración de la página (Limpia y directa)
 st.set_page_config(page_title="Generador de Informes ATM", page_icon="🦷", layout="centered")
-
-# Estilos CSS para asegurar legibilidad en el iPad (Fondo limpio y texto oscuro)
-st.markdown("""
-    <style>
-    .reportview-container, .main {
-        background-color: #FFFFFF !important;
-        color: #1E1E1E !important;
-    }
-    h1, h2, h3, label, p {
-        color: #1A365D !important;
-    }
-    .stButton>button {
-        background-color: #2B6CB0 !important;
-        color: white !important;
-        border-radius: 8px;
-    }
-    /* Estilo especial para la tarjeta del cálculo del cóndilo */
-    .resultado-calculo {
-        background-color: #F7FAFC !important;
-        padding: 15px;
-        border-left: 5px solid #2B6CB0;
-        border-radius: 4px;
-        margin: 15px 0;
-    }
-    </style>
-""", unsafe_gradient=True)
 
 st.title("📋 Generador de Informes Ecográficos ATM")
 st.subheader("Clínica de Ecografía")
@@ -60,14 +34,9 @@ st.markdown("### 📐 Cálculo de la Posición del Cóndilo")
 traslacion_d = boca_cerrada_d - boca_abierta_d
 traslacion_i = boca_cerrada_i - boca_abierta_i
 
-# Mostrar el resultado de forma impecable en el iPad
-st.markdown(f"""
-<div class="resultado-calculo">
-    <h4 style="margin:0 0 10px 0; color:#2B6CB0;">📍 Resultados del Desplazamiento Condilar:</h4>
-    <p style="margin:5px 0; font-size:11pt; color:#2D3748;"><b>Lado Derecho:</b> {traslacion_d:.1st} mm</p>
-    <p style="margin:5px 0; font-size:11pt; color:#2D3748;"><b>Lado Izquierdo:</b> {traslacion_i:.1st} mm</p>
-</div>
-""", unsafe_allow_html=True)
+# Mostrar el resultado de forma limpia y legible en cualquier pantalla (Evita fallos de modo oscuro)
+st.info(f"📍 **Lado Derecho (Desplazamiento):** {traslacion_d:.1f} mm")
+st.info(f"📍 **Lado Izquierdo (Desplazamiento):** {traslacion_i:.1f} mm")
 
 # --- COMENTARIOS / OBSERVACIONES ---
 st.markdown("### ✍️ Conclusiones y Observaciones")
