@@ -38,7 +38,6 @@ def componente_microfono_visible(lado_id):
     let recognition_{lado_id} = null;
     let activo_{lado_id} = false;
 
-    // Función obligatoria para comunicar de forma segura con Streamlit sin saltarse la frontera
     function enviarAStreamlit(textoNumeros) {{
         if (window.Streamlit) {{
             Streamlit.setComponentValue(textoNumeros);
@@ -88,7 +87,6 @@ def componente_microfono_visible(lado_id):
                 status.innerText = "✓ Medidas capturadas correctamente.";
                 status.style.color = "#16A34A";
                 
-                // Envío seguro a Streamlit
                 enviarAStreamlit(resultadoCadena);
             }} else {{
                 status.innerText = "❌ Reintenta: Di 3 números claros.";
@@ -118,7 +116,6 @@ def componente_microfono_visible(lado_id):
         if(msg) status.innerText = msg;
     }}
 
-    // Conector oficial de Streamlit para asegurar la altura perfecta del bloque
     (function() {{
         var stScript = document.createElement('script');
         stScript.src = "https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js";
@@ -141,15 +138,18 @@ def componente_microfono_visible(lado_id):
     """
     return components.html(js_code, height=65, scrolling=False)
 
-# --- FUNCIÓN EXTRACTORA DE TEXTO DICTADO ---
-def extraer_tres_medidas(texto_dictado, campo_manual_as, campo_manual_lat, campo_manual_pi):
-    if texto_dictado and isinstance(texto_dictado, str):
-        numeros = re.findall(r"[-+]?\d*\.\d+|\d+", texto_dictado)
+# --- FUNCIÓN INTELIGENTE: EXTRAE Y ASIGNA POR ORDEN LOS DATOS ---
+def procesar_medidas_sistema(texto_dictado, manual_as, manual_lat, manual_pi):
+    # Si la caja blanca tiene texto, extraemos secuencialmente los 3 valores
+    if texto_dictado and isinstance(texto_dictado, str) and len(texto_dictado).strip() > 0:
+        numeros = re.findall(r"[0-9]+(?:\.[0-9]+)?", texto_dictado)
         if len(numeros) >= 3:
             return numeros[0], numeros[1], numeros[2]
-    return campo_manual_as, campo_manual_lat, campo_manual_pi
+            
+    # Si la caja blanca está vacía, recurrimos a las casillas manuales
+    return manual_as, manual_lat, manual_pi
 
-# --- FUNCIÓN MATEMÁTICA CORREGIDA DEL ÍNDICE DE PULLINGER ---
+# --- FUNCIÓN MATEMÁTICA DEL ÍNDICE DE PULLINGER ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
     try:
         if not ant_sup_txt or not post_inf_txt:
@@ -217,24 +217,24 @@ with col_der:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Capturamos de forma 100% segura la cadena del micrófono
+    # 1. El micrófono captura el bloque de texto en el iPad
     dictado_der = componente_microfono_visible("der")
     
-    # Entradas manuales de apoyo por si quieres cambiar algo tecleando
+    # 2. Las casillas grises para control manual o visual alternativo
     m1, m2, m3 = st.columns(3)
     with m1: manual_as_der = st.text_input("Anterosuperior (D)", key="man_as_der")
     with m2: manual_lat_der = st.text_input("Lateral (D)", key="man_lat_der")
     with m3: manual_pi_der = st.text_input("Posteroinferior (D)", key="man_pi_der")
     
-    # El sistema decide qué datos usar (Prioridad al Dictado Activo)
-    med_as_der, med_lat_der, med_pi_der = extraer_tres_medidas(dictado_der, manual_as_der, manual_lat_der, manual_pi_der)
+    # 3. El procesador interno distribuye las variables de forma transparente
+    med_as_der, med_lat_der, med_pi_der = procesar_medidas_sistema(dictado_der, manual_as_der, manual_lat_der, manual_pi_der)
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
     situacion_der = st.selectbox("Situación (D):", opts_situacion, key="sit_der")
     relacion_der = st.selectbox("Relación cóndilo-cavidad glenoidea (D):", opts_relacion, key="rel_der")
     
-    # Cálculo directo e independiente de la frontera
+    # 4. Cálculo instantáneo usando el dato extraído de la caja blanca
     res_der = calcular_posicion_condilo(med_as_der, med_pi_der)
     st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (D):</strong> {res_der}</div>", unsafe_allow_html=True)
     
@@ -260,24 +260,24 @@ with col_izq:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Capturamos de forma 100% segura la cadena del micrófono
+    # 1. El micrófono captura el bloque de texto en el iPad
     dictado_izq = componente_microfono_visible("izq")
     
-    # Entradas manuales de apoyo por si quieres cambiar algo tecleando
+    # 2. Las casillas grises para control manual o visual alternativo
     m4, m5, m6 = st.columns(3)
     with m4: manual_as_izq = st.text_input("Anterosuperior (I)", key="man_as_izq")
     with m5: manual_lat_izq = st.text_input("Lateral (I)", key="man_lat_izq")
     with m6: manual_pi_izq = st.text_input("Posteroinferior (I)", key="man_pi_izq")
     
-    # El sistema decide qué datos usar (Prioridad al Dictado Activo)
-    med_as_izq, med_lat_izq, med_pi_izq = extraer_tres_medidas(dictado_izq, manual_as_izq, manual_lat_izq, manual_pi_izq)
+    # 3. El procesador interno distribuye las variables de forma transparente
+    med_as_izq, med_lat_izq, med_pi_izq = procesar_medidas_sistema(dictado_izq, manual_as_izq, manual_lat_izq, manual_pi_izq)
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
     situacion_izq = st.selectbox("Situación (I):", opts_situacion, key="sit_izq")
     relacion_izq = st.selectbox("Relación cóndilo-cavidad glenoidea (I):", opts_relacion, key="rel_izq")
     
-    # Cálculo directo e independiente de la frontera
+    # 4. Cálculo instantáneo usando el dato extraído de la caja blanca
     res_izq = calcular_posicion_condilo(med_as_izq, med_pi_izq)
     st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
     
