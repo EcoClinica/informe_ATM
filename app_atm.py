@@ -3,11 +3,12 @@ import streamlit.components.v1 as components
 from docxtpl import DocxTemplate
 import datetime
 import io
+import re
 
 # Configuración de página ancha profesional
 st.set_page_config(page_title="Informe Ecográfico ATM", layout="wide")
 
-# Estilo CSS original, limpio y adaptado para iPad
+# Estilo CSS original e impecable
 st.markdown("""
     <style>
     .titulo-principal { color: #1E3A8A; font-weight: bold; text-align: center; }
@@ -21,33 +22,39 @@ st.markdown("""
 st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulación Temporomandibular (ATM)</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
-# --- FUNCIÓN DEL MICRÓFONO INTELIGENTE ON/OFF ---
-def componente_microfono(lado_id):
-    # Generamos identificadores únicos para los campos de texto según el lado
-    id_as = f"input_as_{lado_id}"
-    id_lat = f"input_lat_{lado_id}"
-    id_pi = f"input_pi_{lado_id}"
-    
+# --- FUNCIÓN DEL MICRÓFONO CON CAJA DE TEXTO VISIBLE INTEGRADA ---
+def componente_microfono_visible(lado_id):
     js_code = f"""
-    <div style="font-family: sans-serif; margin-bottom: 10px;">
-        <button id="btn_{lado_id}" class="btn-voz btn-azul" onclick="conmutarMicro('{lado_id}')">🎙️ Dictar 3 Medidas</button>
-        <p id="status_{lado_id}" style="font-size:11px; color:#666; margin:4px 0 0 2px;">Micro listo</p>
+    <div style="font-family: sans-serif; display: flex; flex-direction: column; gap: 5px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <button id="btn_{lado_id}" class="btn-voz btn-azul" onclick="conmutarMicro('{lado_id}')" style="flex-shrink: 0;">🎙️ Dictar 3 Medidas</button>
+            <input type="text" id="output_local_{lado_id}" placeholder="Esperando dictado..." readonly 
+                   style="flex-grow: 1; padding: 6px; font-size: 15px; font-weight: bold; border: 2px solid #0284C7; border-radius: 4px; background-color: #FFFFFF; color: #000000; text-align: center;">
+        </div>
+        <p id="status_{lado_id}" style="font-size:11px; color:#666; margin: 2px 0 0 2px; height: 14px; overflow: hidden;">Micro listo</p>
     </div>
 
     <script>
     let recognition_{lado_id} = null;
     let activo_{lado_id} = false;
 
+    // Función obligatoria para comunicar de forma segura con Streamlit sin saltarse la frontera
+    function enviarAStreamlit(textoNumeros) {{
+        if (window.Streamlit) {{
+            Streamlit.setComponentValue(textoNumeros);
+        }}
+    }}
+
     function conmutarMicro(lado) {{
         const btn = document.getElementById('btn_' + lado);
         const status = document.getElementById('status_' + lado);
+        const inputLocal = document.getElementById('output_local_' + lado);
 
         if (activo_{lado_id}) {{
-            // FUNCIÓN: Si está activo, apagar inmediatamente al pulsar de nuevo
             if (recognition_{lado_id}) {{
                 recognition_{lado_id}.abort();
             }}
-            resetearBoton(lado, "🛑 Dictado cancelado por el usuario.");
+            resetearBoton(lado, "🛑 Dictado cancelado.");
             return;
         }}
 
@@ -62,36 +69,36 @@ def componente_microfono(lado_id):
         recognition_{lado_id}.interimResults = false;
         recognition_{lado_id}.maxAlternatives = 1;
 
-        // Cambiar estado a encendido (Botón Rojo de stop)
         activo_{lado_id} = true;
-        btn.innerText = "🛑 Detener / Cancelar";
+        btn.innerText = "🛑 Cancelar";
         btn.className = "btn-voz btn-rojo";
         status.innerText = "🎙️ Escuchando... Di los 3 números seguidos";
         status.style.color = "#0284C7";
+        inputLocal.value = "";
 
         recognition_{lado_id}.start();
 
-        recognition_{lado_id}.onresult = function(event) {{
+        recognition_{lado_id].onresult = function(event) {{
             const texto = event.results[0][0].transcript;
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
             if (matches && matches.length >= 3) {{
-                status.innerText = "✓ Medidas introducidas con éxito.";
+                const resultadoCadena = matches[0] + " , " + matches[1] + " , " + matches[2];
+                inputLocal.value = resultadoCadena;
+                status.innerText = "✓ Medidas capturadas correctamente.";
                 status.style.color = "#16A34A";
                 
-                // INYECTOR DIRECTO AL DOM DEL IPAD (Fuerza la inserción interna y dispara los cálculos)
-                inyectarValor('{id_as}', matches[0]);
-                inyectarValor('{id_lat}', matches[1]);
-                inyectarValor('{id_pi}', matches[2]);
+                // Envío seguro a Streamlit
+                enviarAStreamlit(resultadoCadena);
             }} else {{
-                status.innerText = "❌ No se capturaron 3 números. Inténtalo de nuevo.";
+                status.innerText = "❌ Reintenta: Di 3 números claros.";
                 status.style.color = "#DC2626";
             }}
         }};
 
         recognition_{lado_id}.onerror = function(e) {{
             if (e.error !== 'aborted') {{
-                status.innerText = "❌ Error de micro o silencio prolongado.";
+                status.innerText = "❌ Error de micro o silencio.";
                 status.style.color = "#DC2626";
             }}
             resetearBoton(lado, status.innerText);
@@ -102,44 +109,49 @@ def componente_microfono(lado_id):
         }};
     }}
 
-    function inyectarValor(idCampo, valor) {{
-        // Buscamos la casilla en la ventana principal del iPad
-        const el = window.parent.document.getElementById(idCampo);
-        if (el) {{
-            el.value = valor;
-            // Disparar eventos nativos para que el motor matemático calcule al instante
-            el.dispatchEvent(new Event('input', {{ bubbles: true }}));
-            el.dispatchEvent(new Event('change', {{ bubbles: true }}));
-            el.dispatchEvent(new Event('blur', {{ bubbles: true }}));
-        }}
-    }}
-
     function resetearBoton(lado, msg) {{
         activo_{lado_id} = false;
         const btn = document.getElementById('btn_' + lado);
         const status = document.getElementById('status_' + lado);
         btn.innerText = "🎙️ Dictar 3 Medidas";
         btn.className = "btn-voz btn-azul";
-        if(msg) {{
-            status.innerText = msg;
-        }} else {{
-            status.innerText = "Micro listo";
-            status.style.color = "#666";
-        }}
+        if(msg) status.innerText = msg;
     }}
+
+    // Conector oficial de Streamlit para asegurar la altura perfecta del bloque
+    (function() {{
+        var stScript = document.createElement('script');
+        stScript.src = "https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js";
+        stScript.onload = function() {{
+            window.addEventListener('load', function() {{
+                Streamlit.setFrameHeight(65);
+            }});
+        }};
+        document.head.appendChild(stScript);
+    }})();
     </script>
 
     <style>
-    .btn-voz {{ border: none; padding: 7px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s; }}
+    .btn-voz {{ border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; transition: background 0.2s; height: 35px; }}
     .btn-azul {{ background-color: #0284C7; color: white; }}
     .btn-azul:hover {{ background-color: #0369A1; }}
     .btn-rojo {{ background-color: #DC2626; color: white; }}
     .btn-rojo:hover {{ background-color: #B91C1C; }}
     </style>
     """
-    components.html(js_code, height=52, scrolling=False)
+    return components.html(js_code, height=65, scrolling=False)
 
-# --- FUNCIÓN CORREGIDA PARA EL ÍNDICE DE PULLINGER (NÚMERO ABSOLUTO CON SIGNO) ---
+# --- FUNCIÓN EXTRACTORA DE TEXTO DICTADO ---
+def extraer_tres_medidas(texto_dictado, campo_manual_as, campo_manual_lat, campo_manual_pi):
+    # Si hay texto del dictado por voz, lo procesamos con prioridad
+    if texto_dictado and isinstance(texto_dictado, str):
+        numeros = re.findall(r"[-+]?\d*\.\d+|\d+", texto_dictado)
+        if len(numeros) >= 3:
+            return numeros[0], numeros[1], numeros[2]
+    # Si no se ha dictado nada, devolvemos los valores manuales escritos en las casillas grises
+    return campo_manual_as, campo_manual_lat, campo_manual_pi
+
+# --- FUNCIÓN MATEMÁTICA CORREGIDA DEL ÍNDICE DE PULLINGER ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
     try:
         if not ant_sup_txt or not post_inf_txt:
@@ -148,7 +160,6 @@ def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
         pi_val = float(str(post_inf_txt).replace(',', '.'))
         if (pi_val + as_val) == 0: 
             return "0.00"
-        # Fórmula matemática Pullinger original (*100 es parte del índice absoluto)
         resultado = ((pi_val - as_val) / (pi_val + as_val)) * 100
         signo = "+" if resultado > 0 else ""
         return f"{signo}{resultado:.2f}"
@@ -176,7 +187,7 @@ st.markdown("<br>", unsafe_allow_html=True)
 # --- OPCIONES MÉDICAS ---
 opts_morfologia = ["Redondeado", "Aplanado", "En pico de pájaro (en punta)", "Con cresta central", "Con cresta marginal"]
 opts_cartilago = ["Regular", "Irregular", "Fragmentado, sin exposición del hueso subyacente", "Fragmentado con exposición del hueso subyacente"]
-opts_espacio = ["Libre", "Sin derrame articular", "Con engrosamiento sinovial", "Con derrame anecoico", "Con derrame articular y con partículas ecogénicas", "Osteofitos"]
+opts_espacio = ["Libre", "Sin derrame articular", "Con engrosamiento sinovial", "Con derrame anecoico", "Con derrame articular and con partículas ecogénicas", "Osteofitos"]
 opts_ecoestructura = ["Homogénea, hipoecogénico", "Heterogénea", "Irregular"]
 opts_situacion = ["Central, cubre la cabeza condilar", "Cubre parcialmente la cabeza condilar", "Desplazamiento, no cubre la cabeza condilar"]
 opts_relacion = ["Central", "Anterior", "Posterior"]
@@ -208,20 +219,24 @@ with col_der:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Renderizamos el botón con el conmutador ON/OFF integrado
-    componente_microfono("der")
+    # Capturamos de forma 100% segura la cadena del micrófono
+    dictado_der = componente_microfono_visible("der")
     
-    # Fila de casillas original con IDs explícitos para el inyector rápido
+    # Entradas manuales de apoyo por si quieres cambiar algo tecleando
     m1, m2, m3 = st.columns(3)
-    with m1: med_as_der = st.text_input("Anterosuperior (D)", key="input_as_der")
-    with m2: med_lat_der = st.text_input("Lateral (D)", key="input_lat_der")
-    with m3: med_pi_der = st.text_input("Posteroinferior (D)", key="input_pi_der")
+    with m1: manual_as_der = st.text_input("Anterosuperior (D)", key="man_as_der")
+    with m2: manual_lat_der = st.text_input("Lateral (D)", key="man_lat_der")
+    with m3: manual_pi_der = st.text_input("Posteroinferior (D)", key="man_pi_der")
+    
+    # El sistema decide qué datos usar (Prioridad al Dictado Activo)
+    med_as_der, med_lat_der, med_pi_der = extraer_tres_medidas(dictado_der, manual_as_der, manual_lat_der, manual_pi_der)
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
     situacion_der = st.selectbox("Situación (D):", opts_situacion, key="sit_der")
     relacion_der = st.selectbox("Relación cóndilo-cavidad glenoidea (D):", opts_relacion, key="rel_der")
     
+    # Cálculo directo e independiente de la frontera
     res_der = calcular_posicion_condilo(med_as_der, med_pi_der)
     st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (D):</strong> {res_der}</div>", unsafe_allow_html=True)
     
@@ -247,20 +262,24 @@ with col_izq:
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
     
-    # Renderizamos el botón con el conmutador ON/OFF integrado
-    componente_microfono("izq")
+    # Capturamos de forma 100% segura la cadena del micrófono
+    dictado_izq = componente_microfono_visible("izq")
     
-    # Fila de casillas original con IDs explícitos para el inyector rápido
+    # Entradas manuales de apoyo por si quieres cambiar algo tecleando
     m4, m5, m6 = st.columns(3)
-    with m4: med_as_izq = st.text_input("Anterosuperior (I)", key="input_as_izq")
-    with m5: med_lat_izq = st.text_input("Lateral (I)", key="input_lat_izq")
-    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", key="input_pi_izq")
+    with m4: manual_as_izq = st.text_input("Anterosuperior (I)", key="man_as_izq")
+    with m5: manual_lat_izq = st.text_input("Lateral (I)", key="man_lat_izq")
+    with m6: manual_pi_izq = st.text_input("Posteroinferior (I)", key="man_pi_izq")
+    
+    # El sistema decide qué datos usar (Prioridad al Dictado Activo)
+    med_as_izq, med_lat_izq, med_pi_izq = extraer_tres_medidas(dictado_izq, manual_as_izq, manual_lat_izq, manual_pi_izq)
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
     situacion_izq = st.selectbox("Situación (I):", opts_situacion, key="sit_izq")
     relacion_izq = st.selectbox("Relación cóndilo-cavidad glenoidea (I):", opts_relacion, key="rel_izq")
     
+    # Cálculo directo e independiente de la frontera
     res_izq = calcular_posicion_condilo(med_as_izq, med_pi_izq)
     st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
     
