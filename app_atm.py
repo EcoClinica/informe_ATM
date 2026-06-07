@@ -24,15 +24,15 @@ st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulació
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
 # --- INICIALIZACIÓN DE VALORES SEGUROS EN MEMORIA ---
-if 'mas_d_val' not in st.session_state: st.session_state.mas_d_val = ""
-if 'mlat_d_val' not in st.session_state: st.session_state.mlat_d_val = ""
-if 'mpi_d_val' not in st.session_state: st.session_state.mpi_d_val = ""
+if 'mas_d' not in st.session_state: st.session_state.mas_d = ""
+if 'mlat_d' not in st.session_state: st.session_state.mlat_d = ""
+if 'mpi_d' not in st.session_state: st.session_state.mpi_d = ""
 
-if 'mas_i_val' not in st.session_state: st.session_state.mas_i_val = ""
-if 'mlat_i_val' not in st.session_state: st.session_state.mlat_i_val = ""
-if 'mpi_i_val' not in st.session_state: st.session_state.mpi_i_val = ""
+if 'mas_i' not in st.session_state: st.session_state.mas_i = ""
+if 'mlat_i' not in st.session_state: st.session_state.mlat_i = ""
+if 'mpi_i' not in st.session_state: st.session_state.mpi_i = ""
 
-# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CON AUTO-RESETEO) ---
+# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CON CONEXIÓN AL BACKEND) ---
 def componente_microfono(key_prefijo):
     js_code = f"""
     <button class="btn-voz" id="btn_{key_prefijo}" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
@@ -50,7 +50,6 @@ def componente_microfono(key_prefijo):
             return;
         }}
         
-        // Evitar solapamientos si ya está escuchando
         if(btn.disabled) return;
 
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -71,33 +70,30 @@ def componente_microfono(key_prefijo):
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
             if (matches && matches.length >= 3) {{
-                status.innerText = "✓ Procesado: " + matches[0] + " - " + matches[1] + " - " + matches[2];
+                status.innerText = "✓ Procesado con éxito";
                 status.style.color = "#16A34A";
                 
-                // Enviar de forma segura a Streamlit usando la API oficial del componente
-                Streamlit.setComponentValue({{
-                    as: matches[0],
-                    lat: matches[1],
-                    pi: matches[2]
-                }});
+                // Enviamos los datos simulando un cambio de query param para que Streamlit reaccione de forma nativa
+                const url = new URL(window.parent.location.href);
+                url.searchParams.set('lado', prefix);
+                url.searchParams.set('as', matches[0]);
+                url.searchParams.set('lat', matches[1]);
+                url.searchParams.set('pi', matches[2]);
+                window.parent.location.href = url.href;
             }} else {{
-                status.innerText = "❌ Di 3 números claramente (ej: 2.1, 3.4, 1.2)";
+                status.innerText = "❌ Di 3 números claramente.";
                 status.style.color = "#DC2626";
+                resetearBoton();
             }}
         }};
 
-        // Función crítica: Pase lo que pase, al terminar el audio se reactiva el botón para volver a intentar
         function resetearBoton() {{
             btn.disabled = false;
             btn.style.opacity = "1";
-            if (!status.innerText.includes("✓") && !status.innerText.includes("❌")) {{
-                status.innerText = "Micro listo";
-                status.style.color = "#666";
-            }}
         }}
 
         recognition.onerror = function() {{
-            status.innerText = "❌ Error de micro o silencio. Inténtalo de nuevo.";
+            status.innerText = "❌ Error de micro. Reintenta.";
             status.style.color = "#DC2626";
             resetearBoton();
         }};
@@ -107,23 +103,27 @@ def componente_microfono(key_prefijo):
         }};
     }}
     </script>
-    
-    <script src="https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js"></script>
-    <script>
-        // Inicializar el puente de comunicación de Streamlit
-        function onStreamlitReady() {{
-            Streamlit.setFrameHeight(60);
-        }}
-        window.addEventListener('load', onStreamlitReady);
-    </script>
-
     <style>
     .btn-voz {{ background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: sans-serif; font-size: 13px; }}
     .btn-voz:hover {{ background-color: #0369A1; }}
     </style>
     """
-    # Retornamos el valor capturado de forma nativa
-    return components.html(js_code, height=60, scrolling=False)
+    components.html(js_code, height=55, scrolling=False)
+
+# --- PROCESADOR DE DATOS DESDE EL REFRESCO ---
+params = st.query_params
+if "lado" in params:
+    lado_act = params["lado"]
+    if lado_act == "der":
+        st.session_state.mas_d = params.get("as", "")
+        st.session_state.mlat_d = params.get("lat", "")
+        st.session_state.mpi_d = params.get("pi", "")
+    elif lado_act == "izq":
+        st.session_state.mas_i = params.get("as", "")
+        st.session_state.mlat_i = params.get("lat", "")
+        st.session_state.mpi_i = params.get("pi", "")
+    # Limpiamos los parámetros para que no se queden en bucle
+    st.query_params.clear()
 
 # --- FUNCIÓN PARA CALCULAR LA FÓRMULA DE PULLINGER ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
@@ -189,19 +189,13 @@ with col_der:
     espacio_der = st.multiselect("Espacio articular (D):", opts_espacio, default=["Libre"], key="es_der")
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
+    componente_microfono("der")
     
-    # Capturamos el evento del micrófono nativo derecho de Streamlit
-    evento_der = componente_microfono("der")
-    if evento_der and isinstance(evento_der, dict):
-        st.session_state.mas_d_val = evento_der.get("as", "")
-        st.session_state.mlat_d_val = evento_der.get("lat", "")
-        st.session_state.mpi_d_val = evento_der.get("pi", "")
-    
-    # Fila de casillas grises nativas impecables
+    # Vinculación directa a la memoria interna de la App
     m1, m2, m3 = st.columns(3)
-    with m1: med_as_der = st.text_input("Anterosuperior (D)", value=st.session_state.mas_d_val, key="mas_d")
-    with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d_val, key="mlat_d")
-    with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d_val, key="mpi_d")
+    with m1: med_as_der = st.text_input("Anterosuperior (D)", value=st.session_state.mas_d, key="mas_d_input")
+    with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d, key="mlat_d_input")
+    with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d, key="mpi_d_input")
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
@@ -232,19 +226,13 @@ with col_izq:
     espacio_izq = st.multiselect("Espacio articular (I):", opts_espacio, default=["Libre"], key="es_izq")
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
+    componente_microfono("izq")
     
-    # Capturamos el evento del micrófono nativo izquierdo de Streamlit
-    evento_izq = componente_microfono("izq")
-    if evento_izq and isinstance(evento_izq, dict):
-        st.session_state.mas_i_val = evento_izq.get("as", "")
-        st.session_state.mlat_i_val = evento_izq.get("lat", "")
-        st.session_state.mpi_i_val = evento_izq.get("pi", "")
-    
-    # Fila de casillas grises nativas impecables
+    # Vinculación directa a la memoria interna de la App
     m4, m5, m6 = st.columns(3)
-    with m4: med_as_izq = st.text_input("Anterosuperior (I)", value=st.session_state.mas_i_val, key="mas_i")
-    with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i_val, key="mlat_i")
-    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i_val, key="mpi_i")
+    with m4: med_as_izq = st.text_input("Anterosuperior (I)", value=st.session_state.mas_i, key="mas_i_input")
+    with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i, key="mlat_i_input")
+    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i, key="mpi_i_input")
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
