@@ -88,4 +88,3 @@ if st.button("🚀 DESCARGAR INFORME EN WORD"):
             
         except Exception as e:
             st.error(f"Error al generar el Word: {e}. Asegúrate de tener el archivo 'plantilla_atm.docx' subido a GitHub.")
-            st.error(f"Error al generar el Word: {e}. Asegúrate de tener el archivo 'plantilla_atm.docx' subido a GitHub.")
