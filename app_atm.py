@@ -7,146 +7,79 @@ import io
 # Configuración de página ancha profesional
 st.set_page_config(page_title="Informe Ecográfico ATM", layout="wide")
 
-# Estilo CSS unificado en azul clínico
+# Estilo CSS original (Casillas nativas, alineadas y limpias)
 st.markdown("""
     <style>
     .titulo-principal { color: #1E3A8A; font-weight: bold; text-align: center; }
     .sub-seccion { color: #0284C7; border-bottom: 2px solid #0284C7; padding-bottom: 5px; margin-bottom: 15px; }
-    .resultado-calculo { background-color: #E0F2FE; padding: 10px; border-radius: 5px; border-left: 4px solid #0284C7; margin-top: 10px; font-size: 14px; color: #1E3A8A !important; }
+    .titulo-medidas { font-size: 14px; font-weight: bold; margin-bottom: 5px; color: #FFFFFF !important; }
     .esfera { font-size: 16px; vertical-align: middle; margin-right: 5px; }
+    .resultado-calculo { background-color: #E0F2FE; padding: 10px; border-radius: 5px; border-left: 4px solid #0284C7; margin-top: 10px; font-size: 14px; color: #1E3A8A !important; }
+    .btn-voz { background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; margin-bottom: 10px; font-size: 13px; }
+    .btn-voz:hover { background-color: #0369A1; }
     </style>
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulación Temporomandibular (ATM)</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
-# --- COMPONENTE INTEGRADO: MICROFÓNO + CASILLAS PROFESIONALES ---
-def bloque_medidas_voz(lado, val_as, val_lat, val_pi):
-    # Generamos los IDs únicos según el lado
-    id_as = f"as_{lado}"
-    id_lat = f"lat_{lado}"
-    id_pi = f"pi_{lado}"
-    
-    html_code = f"""
-    <div class="contenedor-medidas">
-        <button class="btn-voz" onclick="iniciarDictado('{lado}')">🎙️ Dictar 3 Medidas seguidas</button>
-        <span id="status_{lado}" class="status-texto">Micro apagado</span>
-        
-        <div class="grid-casillas">
-            <div class="col-casilla">
-                <label class="titulo-medidas">Anterosuperior ({lado.upper()})</label>
-                <input type="text" id="{id_as}" class="input-gris" value="{val_as}" oninput="actualizarPython('{lado}')">
-            </div>
-            <div class="col-casilla">
-                <label class="titulo-medidas">Lateral ({lado.upper()})</label>
-                <input type="text" id="{id_lat}" class="input-gris" value="{val_lat}" oninput="actualizarPython('{lado}')">
-            </div>
-            <div class="col-casilla">
-                <label class="titulo-medidas">Posteroinferior ({lado.upper()})</label>
-                <input type="text" id="{id_pi}" class="input-gris" value="{val_pi}" oninput="actualizarPython('{lado}')">
-            </div>
-        </div>
-    </div>
+# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ ---
+def componente_microfono(key_prefijo):
+    js_code = f"""
+    <button class="btn-voz" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
+    <p id="status_{key_prefijo}" style="font-size:11px; color:#666; margin:2px 0 0 0; font-family:sans-serif;">Micro ready</p>
 
     <script>
-    function iniciarDictado(lado) {{
-        const status = document.getElementById('status_' + lado);
+    function iniciarDictado(prefix) {{
+        const status = document.getElementById('status_' + prefix);
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
-            status.innerText = "❌ Navegador no compatible";
+            status.innerText = "Navegador no compatible.";
             return;
-        }}
+         }}
         
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         recognition.lang = 'es-ES';
         recognition.interimResults = false;
-        
+
         status.innerText = "🎙️ Escuchando...";
         status.style.color = "#0284C7";
         recognition.start();
 
         recognition.onresult = function(event) {{
             const texto = event.results[0][0].transcript;
-            // Limpiamos el texto y extraemos los números sueltos
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
             if (matches && matches.length >= 3) {{
-                // Colocar los números DIRECTAMENTE dentro de las casillas grises
-                document.getElementById('as_' + lado).value = matches[0];
-                document.getElementById('lat_' + lado).value = matches[1];
-                document.getElementById('pi_' + lado).value = matches[2];
-                
-                status.innerText = "✓ Medidas insertadas";
+                status.innerText = "✓ Enviando al formulario...";
                 status.style.color = "#16A34A";
                 
-                // Avisar a Streamlit para que recalcule las fórmulas
-                enviarASystem(lado, matches[0], matches[1], matches[2]);
+                // Enviamos los datos directamente al marco principal de la aplicación
+                window.parent.postMessage({{
+                    tipo: 'INYECTAR_ATM',
+                    lado: prefix,
+                    as: matches[0],
+                    lat: matches[1],
+                    pi: matches[2]
+                }}, '*');
             }} else {{
-                status.innerText = "❌ Di 3 números. Detectó: " + texto;
+                status.innerText = "❌ Di 3 números claramente.";
                 status.style.color = "#DC2626";
             }}
         }};
 
         recognition.onerror = function() {{
-            status.innerText = "❌ Error micro";
+            status.innerText = "❌ Error de micro.";
             status.style.color = "#DC2626";
         }};
     }}
-
-    function actualizarPython(lado) {{
-        const v_as = document.getElementById('as_' + lado).value;
-        const v_lat = document.getElementById('lat_' + lado).value;
-        const v_pi = document.getElementById('pi_' + lado).value;
-        enviarASystem(lado, v_as, v_lat, v_pi);
-    }}
-
-    function enviarASystem(lado, as_val, lat_val, pi_val) {{
-        window.parent.postMessage({{
-            tipo: 'ACTUALIZAR_MEDIDAS',
-            lado: lado,
-            as: as_val,
-            lat: lat_val,
-            pi: pi_val
-        }}, '*');
-    }}
     </script>
-
     <style>
-    body {{ margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
-    .contenedor-medidas {{ padding: 2px 0; }}
-    .btn-voz {{ background-color: #0284C7; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; }}
+    .btn-voz {{ background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: sans-serif; font-size: 13px; }}
     .btn-voz:hover {{ background-color: #0369A1; }}
-    .status-texto {{ font-size: 13px; color: #666; margin-left: 10px; font-weight: 500; }}
-    
-    .grid-casillas {{ display: flex; gap: 15px; margin-top: 12px; }}
-    .col-casilla {{ flex: 1; display: flex; flex-direction: column; }}
-    
-    /* Títulos idénticos: Letra en blanco y estilizada */
-    .titulo-medidas {{ font-size: 16px; font-weight: bold; margin-bottom: 8px; color: #FFFFFF !important; }}
-    
-    /* Casillas grises perfectas con letra blanca */
-    .input-gris {{ 
-        background-color: #31333F; 
-        color: #FFFFFF; 
-        border: 1px solid rgba(250, 250, 250, 0.2); 
-        padding: 10px; 
-        border-radius: 6px; 
-        font-size: 16px; 
-        outline: none;
-    }}
-    .input-gris:focus {{ border-color: #0284C7; }}
     </style>
     """
-    components.html(html_code, height=145, scrolling=False)
-
-# --- INICIALIZACIÓN DE VALORES EN MEMORIA ---
-if 'as_der' not in st.session_state: st.session_state.as_der = ""
-if 'lat_der' not in st.session_state: st.session_state.lat_der = ""
-if 'pi_der' not in st.session_state: st.session_state.pi_der = ""
-
-if 'as_izq' not in st.session_state: st.session_state.as_izq = ""
-if 'lat_izq' not in st.session_state: st.session_state.lat_izq = ""
-if 'pi_izq' not in st.session_state: st.session_state.pi_izq = ""
+    components.html(js_code, height=60, scrolling=False)
 
 # --- FUNCIÓN PARA CALCULAR LA FÓRMULA DE PULLINGER ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
@@ -211,15 +144,21 @@ with col_der:
     cartilago_der = st.selectbox("Cartílago articular (D):", opts_cartilago, key="ca_der")
     espacio_der = st.multiselect("Espacio articular (D):", opts_espacio, default=["Libre"], key="es_der")
     
-    # Renderizado del bloque integrado para el lado Derecho
-    bloque_medidas_voz("der", st.session_state.as_der, st.session_state.lat_der, st.session_state.pi_der)
+    st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
+    componente_microfono("der")
+    
+    # Fila de casillas original restaurada
+    m1, m2, m3 = st.columns(3)
+    with m1: med_as_der = st.text_input("Anterosuperior (D)", key="mas_d")
+    with m2: med_lat_der = st.text_input("Lateral (D)", key="mlat_d")
+    with m3: med_pi_der = st.text_input("Posteroinferior (D)", key="mpi_d")
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
     situacion_der = st.selectbox("Situación (D):", opts_situacion, key="sit_der")
     relacion_der = st.selectbox("Relación cóndilo-cavidad glenoidea (D):", opts_relacion, key="rel_der")
     
-    res_der = calcular_posicion_condilo(st.session_state.as_der, st.session_state.pi_der)
+    res_der = calcular_posicion_condilo(med_as_der, med_pi_der)
     st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (D):</strong> {res_der}</div>", unsafe_allow_html=True)
     
     st.markdown("<br>**Posición con Boca Cerrada (D):**", unsafe_allow_html=True)
@@ -242,15 +181,21 @@ with col_izq:
     cartilago_izq = st.selectbox("Cartílago articular (I):", opts_cartilago, key="ca_izq")
     espacio_izq = st.multiselect("Espacio articular (I):", opts_espacio, default=["Libre"], key="es_izq")
     
-    # Renderizado del bloque integrado para el lado Izquierdo
-    bloque_medidas_voz("izq", st.session_state.as_izq, st.session_state.lat_izq, st.session_state.pi_izq)
+    st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
+    componente_microfono("izq")
+    
+    # Fila de casillas original restaurada
+    m4, m5, m6 = st.columns(3)
+    with m4: med_as_izq = st.text_input("Anterosuperior (I)", key="mas_i")
+    with m5: med_lat_izq = st.text_input("Lateral (I)", key="mlat_i")
+    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", key="mpi_i")
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
     situacion_izq = st.selectbox("Situación (I):", opts_situacion, key="sit_izq")
     relacion_izq = st.selectbox("Relación cóndilo-cavidad glenoidea (I):", opts_relacion, key="rel_izq")
     
-    res_izq = calcular_posicion_condilo(st.session_state.as_izq, st.session_state.pi_izq)
+    res_izq = calcular_posicion_condilo(med_as_izq, med_pi_izq)
     st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
     
     st.markdown("<br>**Posición con Boca Cerrada (I):**", unsafe_allow_html=True)
@@ -267,32 +212,34 @@ with col_izq:
 st.markdown("<br><hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 conclusion = st.text_area("📝 CONCLUSIÓN / OBSERVACIONES:")
 
-# --- RECEPTOR AUTOMÁTICO EN DETRÁS DE ESCENA ---
+# --- INYECTOR DE PRECISIÓN ABSOLUTA PARA LAS CASILLAS ---
 st.markdown("""
 <script>
 window.addEventListener('message', function(event) {
-    if (event.data.tipo === 'ACTUALIZAR_MEDIDAS') {
-        // Enviar silenciosamente los datos a la memoria de Streamlit para cálculos y descarga Word
-        const url = new URL(window.location.href);
-        window.parent.postMessage({tipo: 'streamlit:setComponentValue', value: event.data}, '*');
+    if (event.data.tipo === 'INYECTAR_ATM') {
+        const lado = event.data.lado;
+        
+        // Localizamos absolutamente todos los inputs del formulario principal
+        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
+        
+        // Filtramos aquellos que corresponden estrictamente a las medidas numéricas de ATM
+        const numInputs = Array.from(inputs).filter(i => i.id && (i.id.includes('mas_') || i.id.includes('mlat_') || i.id.includes('mpi_')));
+        
+        if (lado === 'der' && numInputs.length >= 3) {
+            // Se inyecta directamente el valor dentro de la casilla gris de Streamlit
+            numInputs[0].value = event.data.as; numInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+            numInputs[1].value = event.data.lat; numInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+            numInputs[2].value = event.data.pi; numInputs[2].dispatchEvent(new Event('input', { bubbles: true }));
+        } else if (lado === 'izq' && numInputs.length >= 6) {
+            // Se inyecta en el bloque izquierdo
+            numInputs[3].value = event.data.as; numInputs[3].dispatchEvent(new Event('input', { bubbles: true }));
+            numInputs[4].value = event.data.lat; numInputs[4].dispatchEvent(new Event('input', { bubbles: true }));
+            numInputs[5].value = event.data.pi; numInputs[5].dispatchEvent(new Event('input', { bubbles: true }));
+        }
     }
 });
 </script>
 """, unsafe_allow_html=True)
-
-# Lógica para asimilar los datos dictados en las variables de descarga
-# Usamos un truco limpio de Query Params para refrescar los datos sin romper nada
-query_params = st.query_params
-if "lado" in query_params:
-    ld = query_params["lado"]
-    if ld == "der":
-        st.session_state.as_der = query_params.get("as", "")
-        st.session_state.lat_der = query_params.get("lat", "")
-        st.session_state.pi_der = query_params.get("pi", "")
-    elif ld == "izq":
-        st.session_state.as_izq = query_params.get("as", "")
-        st.session_state.lat_izq = query_params.get("lat", "")
-        st.session_state.pi_izq = query_params.get("pi", "")
 
 # --- SECCIÓN DE DESCARGA ---
 st.subheader("💾 Finalizar Informe")
@@ -308,14 +255,14 @@ try:
         'nombres': nombres, 'apellidos': apellidos, 'edad': edad, 'derivado': derivado,
         'fecha': fecha.strftime("%d/%m/%Y"), 'motivo': motivo, 'antecedentes': antecedentes, 'tratamiento_act': tratamiento_act,
         'morfologia_der': morfologia_der_txt, 'cartilago_der': cartilago_der, 'espacio_der': espacio_der_txt, 
-        'med_as_der': st.session_state.as_der, 'med_lat_der': st.session_state.lat_der, 'med_pi_der': st.session_state.pi_der,
+        'med_as_der': med_as_der, 'med_lat_der': med_lat_der, 'med_pi_der': med_pi_der,
         'ecoestructura_der': ecoestructura_der, 'situacion_der': situacion_der, 'relacion_der': relacion_der,
         'calculo_relacion_der': res_der,
         'hora_cerrada_der': hora_cerrada_der, 'cerrada_txt_der': cerrada_txt_der, 'abierta_txt_der': open_txt_der,
         'repo_forma_der': repo_forma_der, 'repo_tipo_der': repo_tipo_der,
         
         'morfologia_izq': morfologia_izq_txt, 'cartilago_izq': cartilago_izq, 'espacio_izq': espacio_izq_txt, 
-        'med_as_izq': st.session_state.as_izq, 'med_lat_izq': st.session_state.lat_izq, 'med_pi_izq': st.session_state.pi_izq,
+        'med_as_izq': med_as_izq, 'med_lat_izq': med_lat_izq, 'med_pi_izq': med_pi_izq,
         'ecoestructura_izq': ecoestructura_izq, 'situacion_izq': situacion_izq, 'relacion_izq': relacion_izq,
         'calculo_relacion_izq': res_izq,
         'hora_cerrada_izq': hora_cerrada_izq, 'cerrada_txt_izq': cerrada_txt_izq, 'abierta_txt_izq': open_txt_izq,
