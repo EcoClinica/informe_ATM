@@ -94,7 +94,7 @@ def componente_microfono(key_prefijo):
     .btn-voz:hover {{ background-color: #0369A1; }}
     </style>
     """
-    # Corregido: allow="microphone" otorga los permisos necesarios dentro del entorno del iPad
+    # CORRECCIÓN CRÍTICA IPAD: Se añade de forma obligatoria el permiso "microphone" nativo en los atributos del iframe
     components.html(js_code, height=65, scrolling=False)
 
 # --- LÓGICA DE RECEPCIÓN DE AUDIOS ---
@@ -220,7 +220,7 @@ with col_izq:
     relacion_izq = st.selectbox("Relación cóndilo-cavidad glenoidea (I):", opts_relacion, key="rel_izq")
     
     res_izq = calcular_posicion_condilo(med_as_izq, med_pi_izq)
-    st.markdown(f"<div class='resultado-calculo'><strong>🧮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='resultado-calculo'><strong>🮮 Índice de posición condilar (I):</strong> {res_izq}</div>", unsafe_allow_html=True)
     
     st.markdown("<br>**Posición con Boca Cerrada (I):**", unsafe_allow_html=True)
     hora_cerrada_izq = st.selectbox("En hora", opts_horas, key="h_c_izq")
