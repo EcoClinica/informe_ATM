@@ -7,7 +7,7 @@ import io
 # Configuración de página ancha profesional
 st.set_page_config(page_title="Informe Ecográfico ATM", layout="wide")
 
-# Estilo CSS original (Casillas nativas, alineadas y limpias)
+# Estilo CSS original e impecable
 st.markdown("""
     <style>
     .titulo-principal { color: #1E3A8A; font-weight: bold; text-align: center; }
@@ -23,27 +23,47 @@ st.markdown("""
 st.markdown("<h1 class='titulo-principal'>Informe Ecográfico de la Articulación Temporomandibular (ATM)</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 
-# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ ---
+# --- INICIALIZACIÓN DE VALORES SEGUROS EN MEMORIA ---
+if 'mas_d_val' not in st.session_state: st.session_state.mas_d_val = ""
+if 'mlat_d_val' not in st.session_state: st.session_state.mlat_d_val = ""
+if 'mpi_d_val' not in st.session_state: st.session_state.mpi_d_val = ""
+
+if 'mas_i_val' not in st.session_state: st.session_state.mas_i_val = ""
+if 'mlat_i_val' not in st.session_state: st.session_state.mlat_i_val = ""
+if 'mpi_i_val' not in st.session_state: st.session_state.mpi_i_val = ""
+
+# --- FUNCIÓN JAVASCRIPT PARA DICTADO POR VOZ (CON AUTO-RESETEO) ---
 def componente_microfono(key_prefijo):
     js_code = f"""
-    <button class="btn-voz" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
-    <p id="status_{key_prefijo}" style="font-size:11px; color:#666; margin:2px 0 0 0; font-family:sans-serif;">Micro ready</p>
+    <button class="btn-voz" id="btn_{key_prefijo}" onclick="iniciarDictado('{key_prefijo}')">🎙️ Dictar 3 Medidas seguidas</button>
+    <p id="status_{key_prefijo}" style="font-size:11px; color:#666; margin:2px 0 0 0; font-family:sans-serif;">Micro listo</p>
 
     <script>
+    let recognition = null;
+
     function iniciarDictado(prefix) {{
         const status = document.getElementById('status_' + prefix);
+        const btn = document.getElementById('btn_' + prefix);
+        
         if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {{
             status.innerText = "Navegador no compatible.";
             return;
-         }}
+        }}
         
+        // Evitar solapamientos si ya está escuchando
+        if(btn.disabled) return;
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new SpeechRecognition();
+        recognition = new SpeechRecognition();
         recognition.lang = 'es-ES';
         recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
 
-        status.innerText = "🎙️ Escuchando...";
+        status.innerText = "🎙️ Escuchando... Di los 3 números";
         status.style.color = "#0284C7";
+        btn.disabled = true;
+        btn.style.opacity = "0.6";
+
         recognition.start();
 
         recognition.onresult = function(event) {{
@@ -51,35 +71,59 @@ def componente_microfono(key_prefijo):
             const matches = texto.replace(/,/g, '.').match(/[0-9]+(\\.[0-9]+)?/g);
             
             if (matches && matches.length >= 3) {{
-                status.innerText = "✓ Enviando al formulario...";
+                status.innerText = "✓ Procesado: " + matches[0] + " - " + matches[1] + " - " + matches[2];
                 status.style.color = "#16A34A";
                 
-                // Enviamos los datos directamente al marco principal de la aplicación
-                window.parent.postMessage({{
-                    tipo: 'INYECTAR_ATM',
-                    lado: prefix,
+                // Enviar de forma segura a Streamlit usando la API oficial del componente
+                Streamlit.setComponentValue({{
                     as: matches[0],
                     lat: matches[1],
                     pi: matches[2]
-                }}, '*');
+                }});
             }} else {{
-                status.innerText = "❌ Di 3 números claramente.";
+                status.innerText = "❌ Di 3 números claramente (ej: 2.1, 3.4, 1.2)";
                 status.style.color = "#DC2626";
             }}
         }};
 
+        // Función crítica: Pase lo que pase, al terminar el audio se reactiva el botón para volver a intentar
+        function resetearBoton() {{
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            if (!status.innerText.includes("✓") && !status.innerText.includes("❌")) {{
+                status.innerText = "Micro listo";
+                status.style.color = "#666";
+            }}
+        }}
+
         recognition.onerror = function() {{
-            status.innerText = "❌ Error de micro.";
+            status.innerText = "❌ Error de micro o silencio. Inténtalo de nuevo.";
             status.style.color = "#DC2626";
+            resetearBoton();
+        }};
+        
+        recognition.onend = function() {{
+            resetearBoton();
         }};
     }}
     </script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@streamlit/component-lib@1.4.0/dist/index.min.js"></script>
+    <script>
+        // Inicializar el puente de comunicación de Streamlit
+        function onStreamlitReady() {{
+            Streamlit.setFrameHeight(60);
+        }}
+        window.addEventListener('load', onStreamlitReady);
+    </script>
+
     <style>
     .btn-voz {{ background-color: #0284C7; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-family: sans-serif; font-size: 13px; }}
     .btn-voz:hover {{ background-color: #0369A1; }}
     </style>
     """
-    components.html(js_code, height=60, scrolling=False)
+    # Retornamos el valor capturado de forma nativa
+    return components.html(js_code, height=60, scrolling=False)
 
 # --- FUNCIÓN PARA CALCULAR LA FÓRMULA DE PULLINGER ---
 def calcular_posicion_condilo(ant_sup_txt, post_inf_txt):
@@ -119,7 +163,7 @@ opts_ecoestructura = ["Homogénea, hipoecogénico", "Heterogénea", "Irregular"]
 opts_situacion = ["Central, cubre la cabeza condilar", "Cubre parcialmente la cabeza condilar", "Desplazamiento, no cubre la cabeza condilar"]
 opts_relacion = ["Central", "Anterior", "Posterior"]
 opts_horas = ["", "12", "11", "10", "1", "2", "otra"]
-opts_boca_cerrada = ["Cubre totalmente la cabeza del cóndilo", "Cubre parcialmente la cabeza del cóndilo", "Desplazado, no cubre la cabeza condilar"]
+opts_boca_cerrada = ["Cubre totalmente la cabeza del cóndilo", "Cubre parcialmente la cabeza del cóndilo", "Desplazamiento, no cubre la cabeza condilar"]
 opts_boca_abierta = [
     "Desplazamiento discal normal, cubre la cabeza del cóndilo",
     "Desplazamiento anterior, el disco cubre parcialmente la cabeza del cóndilo",
@@ -145,13 +189,19 @@ with col_der:
     espacio_der = st.multiselect("Espacio articular (D):", opts_espacio, default=["Libre"], key="es_der")
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
-    componente_microfono("der")
     
-    # Fila de casillas original restaurada
+    # Capturamos el evento del micrófono nativo derecho de Streamlit
+    evento_der = componente_microfono("der")
+    if evento_der and isinstance(evento_der, dict):
+        st.session_state.mas_d_val = evento_der.get("as", "")
+        st.session_state.mlat_d_val = evento_der.get("lat", "")
+        st.session_state.mpi_d_val = evento_der.get("pi", "")
+    
+    # Fila de casillas grises nativas impecables
     m1, m2, m3 = st.columns(3)
-    with m1: med_as_der = st.text_input("Anterosuperior (D)", key="mas_d")
-    with m2: med_lat_der = st.text_input("Lateral (D)", key="mlat_d")
-    with m3: med_pi_der = st.text_input("Posteroinferior (D)", key="mpi_d")
+    with m1: med_as_der = st.text_input("Anterosuperior (D)", value=st.session_state.mas_d_val, key="mas_d")
+    with m2: med_lat_der = st.text_input("Lateral (D)", value=st.session_state.mlat_d_val, key="mlat_d")
+    with m3: med_pi_der = st.text_input("Posteroinferior (D)", value=st.session_state.mpi_d_val, key="mpi_d")
     
     st.subheader("Disco Articular Derecho")
     ecoestructura_der = st.selectbox("Ecoestructura (D):", opts_ecoestructura, key="eco_der")
@@ -182,13 +232,19 @@ with col_izq:
     espacio_izq = st.multiselect("Espacio articular (I):", opts_espacio, default=["Libre"], key="es_izq")
     
     st.markdown("<p class='titulo-medidas'>Medidas (mm):</p>", unsafe_allow_html=True)
-    componente_microfono("izq")
     
-    # Fila de casillas original restaurada
+    # Capturamos el evento del micrófono nativo izquierdo de Streamlit
+    evento_izq = componente_microfono("izq")
+    if evento_izq and isinstance(evento_izq, dict):
+        st.session_state.mas_i_val = evento_izq.get("as", "")
+        st.session_state.mlat_i_val = evento_izq.get("lat", "")
+        st.session_state.mpi_i_val = evento_izq.get("pi", "")
+    
+    # Fila de casillas grises nativas impecables
     m4, m5, m6 = st.columns(3)
-    with m4: med_as_izq = st.text_input("Anterosuperior (I)", key="mas_i")
-    with m5: med_lat_izq = st.text_input("Lateral (I)", key="mlat_i")
-    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", key="mpi_i")
+    with m4: med_as_izq = st.text_input("Anterosuperior (I)", value=st.session_state.mas_i_val, key="mas_i")
+    with m5: med_lat_izq = st.text_input("Lateral (I)", value=st.session_state.mlat_i_val, key="mlat_i")
+    with m6: med_pi_izq = st.text_input("Posteroinferior (I)", value=st.session_state.mpi_i_val, key="mpi_i")
     
     st.subheader("Disco Articular Izquierdo")
     ecoestructura_izq = st.selectbox("Ecoestructura (I):", opts_ecoestructura, key="eco_izq")
@@ -211,35 +267,6 @@ with col_izq:
 
 st.markdown("<br><hr style='border: 1px solid #1E3A8A;'>", unsafe_allow_html=True)
 conclusion = st.text_area("📝 CONCLUSIÓN / OBSERVACIONES:")
-
-# --- INYECTOR DE PRECISIÓN ABSOLUTA PARA LAS CASILLAS ---
-st.markdown("""
-<script>
-window.addEventListener('message', function(event) {
-    if (event.data.tipo === 'INYECTAR_ATM') {
-        const lado = event.data.lado;
-        
-        // Localizamos absolutamente todos los inputs del formulario principal
-        const inputs = window.parent.document.querySelectorAll('input[type="text"]');
-        
-        // Filtramos aquellos que corresponden estrictamente a las medidas numéricas de ATM
-        const numInputs = Array.from(inputs).filter(i => i.id && (i.id.includes('mas_') || i.id.includes('mlat_') || i.id.includes('mpi_')));
-        
-        if (lado === 'der' && numInputs.length >= 3) {
-            // Se inyecta directamente el valor dentro de la casilla gris de Streamlit
-            numInputs[0].value = event.data.as; numInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-            numInputs[1].value = event.data.lat; numInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
-            numInputs[2].value = event.data.pi; numInputs[2].dispatchEvent(new Event('input', { bubbles: true }));
-        } else if (lado === 'izq' && numInputs.length >= 6) {
-            // Se inyecta en el bloque izquierdo
-            numInputs[3].value = event.data.as; numInputs[3].dispatchEvent(new Event('input', { bubbles: true }));
-            numInputs[4].value = event.data.lat; numInputs[4].dispatchEvent(new Event('input', { bubbles: true }));
-            numInputs[5].value = event.data.pi; numInputs[5].dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    }
-});
-</script>
-""", unsafe_allow_html=True)
 
 # --- SECCIÓN DE DESCARGA ---
 st.subheader("💾 Finalizar Informe")
